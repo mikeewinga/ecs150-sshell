@@ -1,14 +1,11 @@
-FLAGS=-Wall -Wextra -Werror
+FLAGS = -Wall -Wextra -Werror
 
-all: sshell test
-
-test: sshellTEST.c
-	gcc $(FLAGS) sshellTEST.c -o test 
+all: sshell
 
 sshell: sshell.c
 	gcc $(FLAGS) sshell.c -o sshell 
 
-rmvfiles = sshell test
+rmvfiles = sshell
 
 clean:
 	rm -rf $(rmvfiles) *.o
