@@ -2,8 +2,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define CMDLINE_MAX 512
+
+int SYS_CALL(char* command) {
+	pid_t _pID; 
+	_pID = fork();
+	if (_pID == 0) {
+		execl("/bin/sh", "sh", "-c", command, (char*) NULL);
+	}
+	else {
+		int status;
+		waitpid(_pID, &status, 0);
+		return (status);
+	}
+	return 0;
+}
 
 int main(void)
 {
@@ -40,7 +55,7 @@ int main(void)
                 }
 
                 /* Regular command */
-                retval = system(cmd);
+                retval = SYS_CALL(cmd);
                 fprintf(stdout, "+ completed '%s' [%d]\n",
                         cmd, retval);
         }
