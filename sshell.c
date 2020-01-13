@@ -10,12 +10,23 @@ int SYS_CALL(char* command) {
 	pid_t _pID; 
 	_pID = fork();
 	if (_pID == 0) {
-		execl("/bin/sh", "sh", "-c", command, (char*) NULL);
+		printf("pID value: %d\n", getpid());
+		printf("ppID value: %d\n", getppid());
+		char* newCommand = strcat("/bin/", command);
+		//printf("New command: %s\n", newCommand);
+		char* args[2] = {newCommand, NULL};
+		execv(args[0], args);
+		return 0;
 	}
-	else {
+	else if (_pID > 0) {
 		int status;
 		waitpid(_pID, &status, 0);
+		//printf("_pID wait exit status: %d\n", status);
 		return (status);
+	}
+	else {
+		perror("bad fork");
+		exit(1);
 	}
 	return 0;
 }
@@ -49,15 +60,13 @@ int main(void)
                 /* Builtin command */
                 if (!strcmp(cmd, "exit")) {
                         fprintf(stderr, "Bye...\n");
-						fprintf(stdout, "+ completed '%s' [%d]\n",
-                        cmd, retval);
+			fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
                         break;
                 }
 
                 /* Regular command */
                 retval = SYS_CALL(cmd);
-                fprintf(stdout, "+ completed '%s' [%d]\n",
-                        cmd, retval);
+                fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
         }
 
         return EXIT_SUCCESS;
