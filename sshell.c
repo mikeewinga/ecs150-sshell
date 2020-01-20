@@ -6,69 +6,117 @@
 
 #define CMDLINE_MAX 512
 
-int SYS_CALL(char* command) {	
+void parse_command(char* cmd, char** args) {
+	char temp_cmd[32];
+	memset(temp_cmd, 0, 32);
+	int arg_counter = 0;
+	int char_counter = 0;
+	for (int i = 0; i < 512; i++) {
+		if (cmd[i] == ' ') {
+			if (cmd[i - 1] != ' ') {
+				args[arg_counter] = (char*)malloc(32 * sizeof(char));
+				memcpy(args[arg_counter], temp_cmd, 32);
+				arg_counter += 1;
+				char_counter = 0;
+				memset(temp_cmd, 0, 32);
+				continue;
+			}
+			else {
+				continue;
+			}
+		}
+		else if (cmd[i] == '\0' || cmd[i] == '\n') {
+			args[arg_counter] = (char*)malloc(32 * sizeof(char));
+			memcpy(args[arg_counter], temp_cmd, 32);
+			arg_counter += 1;
+			char_counter = 0;
+			memset(temp_cmd, 0, 32);
+			break;
+		}
+		else {
+			temp_cmd[char_counter] = cmd[i];
+			char_counter += 1;
+		}
+	}
+	args[arg_counter] =(char*)NULL;
+	arg_counter = 0;
+}
+
+
+
+int SYS_CALL(char** args) {	
 	pid_t _pID; 
 	_pID = fork();
 	if (_pID == 0) {
-		char* args[] = {command, (char*)NULL};
 		execvp(args[0], args);
-		return 0;
+		exit(-1);
 	}
 	else if (_pID > 0) {
 		int status;
 		waitpid(_pID, &status, 0);
-		return (status);
+		return(status);
 	}
 	else {
 		perror("bad fork");
-		return (-1);
+		exit(-1);
 	}
 	return 0;
 }
 
+
 int main(void)
 {
-        char cmd[CMDLINE_MAX];
+	char cmd[CMDLINE_MAX];
+	char* commands[16];
 
-        while (1) {
-                char *nl;
-                int retval;
+	while (1) {
+		char *nl;
+		int retval;
 
-                /* Print prompt */
-                printf("sshell$ ");
-                fflush(stdout);
+		/* Print prompt */
+		printf("sshell$ ");
+		fflush(stdout);
 
-                /* Get command line */
-                fgets(cmd, CMDLINE_MAX, stdin);
+		/* Get command line */
+		fgets(cmd, CMDLINE_MAX, stdin);
 
-                /* Print command line if stdin is not provided by terminal */
-                if (!isatty(STDIN_FILENO)) {
-                        printf("%s", cmd);
-                        fflush(stdout);
-                }
+		/* Print command line if stdin is not provided by terminal */
+		if (!isatty(STDIN_FILENO)) {
+			printf("%s", cmd);
+			fflush(stdout);
+		}
 
-                /* Remove trailing newline from command line */
-                nl = strchr(cmd, '\n');
-                if (nl)
-                        *nl = '\0';
+		parse_command(cmd, commands);
 
-                /* Builtin command */
-                if (!strcmp(cmd, "exit")) {
-                        fprintf(stderr, "Bye...\n");
+		/* Remove trailing newline from command line */
+		nl = strchr(cmd, '\n');
+		if (nl) {
+			*nl = '\0';
+		}
+
+
+		/* Builtin command */
+		if (!strcmp(cmd, "exit")) {
+			fprintf(stderr, "Bye...\n");
 			fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
-                        break;
-                }
-		
+			break;
+		}
+
 		if (!strcmp(cmd, "pwd")) {
-			retval = SYS_CALL("ps -p PID -o comm=");
-			//fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
-                }
+			char buf[CMDLINE_MAX];
+			printf("%s\n", getcwd(buf, CMDLINE_MAX));
+			fprintf(stdout, "+ completed '%s' [0]\n", cmd);
+			continue;
+		}
 
 
-                /* Regular command */
-                retval = SYS_CALL(cmd);
-                fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
-        }
+		/* Regular command */
+		retval = SYS_CALL(commands);
+		if(retval != 0){
+			fprintf(stderr, "Error: command not found\n");
+		}
+		fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
+	}
 
-        return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
