@@ -45,15 +45,15 @@ void parse_command(char* cmd, char** args) {
 
 
 int SYS_CALL(char** args) {	
-	pid_t _pID; 
-	_pID = fork();
-	if (_pID == 0) {
+	pid_t _pid; 
+	_pid = fork();	
+	if (_pid == 0) {
 		execvp(args[0], args);
 		exit(-1);
 	}
-	else if (_pID > 0) {
+	else if (_pid > 0) {
 		int status;
-		waitpid(_pID, &status, 0);
+		waitpid(_pid, &status, 0);
 		return(status);
 	}
 	else {
@@ -68,10 +68,11 @@ int main(void)
 {
 	char cmd[CMDLINE_MAX];
 	char* commands[16];
+	//free(commands);
 
 	while (1) {
 		char *nl;
-		int retval;
+		int retval=0;
 
 		/* Print prompt */
 		printf("sshell$ ");
@@ -106,6 +107,27 @@ int main(void)
 			char buf[CMDLINE_MAX];
 			printf("%s\n", getcwd(buf, CMDLINE_MAX));
 			fprintf(stdout, "+ completed '%s' [0]\n", cmd);
+			continue;
+		}
+
+		if (!strcmp(commands[0], "cd")) {
+			char* path = commands[1];
+			if(!strcmp(path, "..")) {
+				char* cwd = getcwd(cwd, CMDLINE_MAX);
+				int slash_index;
+				for(int k=0; k<((int)strlen(cwd))-1; k++) {
+					if (cwd[k] == '/') {
+						slash_index = k;
+					}
+				}
+				char* newPath = malloc(32*sizeof(char));
+				newPath = strncpy(newPath, cwd, slash_index);
+				chdir(newPath);			
+			}
+			else {
+				chdir(path);
+			}
+			fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
 			continue;
 		}
 
