@@ -5,50 +5,94 @@
 #include <sys/wait.h>
 
 #define CMDLINE_MAX 512
+#define ARG_MAX 17
+#define CHAR_MAX 32
+typedef struct process Process;
+typedef struct task Task;
 
-void parse_command(char* cmd, char** args) {
-	char temp_cmd[32];
-	memset(temp_cmd, 0, 32);
+struct process {
+	char* args[ARG_MAX];
+	char* next_arg[ARG_MAX];
+	char opp;
+	char opp_err;
+	int pid;
+	int fd[2];
+	int complete;
+};
+
+struct task {
+	Process processes[ARG_MAX];
+};
+
+void parse_command(const char* cmd, Task* t) {
+	Process p;
+	char temp_arg[CHAR_MAX];
+	memset(temp_arg, 0, CHAR_MAX);
+	int process_counter = 0;
 	int arg_counter = 0;
 	int char_counter = 0;
-	for (int i = 0; i < 512; i++) {
+	for (int i = 0; i < CMDLINE_MAX; i++) {
 		if (cmd[i] == ' ') {
-			if (cmd[i - 1] != ' ') {
-				args[arg_counter] = (char*)malloc(32 * sizeof(char));
-				memcpy(args[arg_counter], temp_cmd, 32);
-				arg_counter += 1;
-				char_counter = 0;
-				memset(temp_cmd, 0, 32);
+			if (cmd[i - 1] == ' ' || char_counter == 0) {
 				continue;
 			}
 			else {
+				p.args[arg_counter] = malloc(CHAR_MAX * sizeof(char));
+				memcpy(p.args[arg_counter], temp_arg, CHAR_MAX);
+				memset(temp_arg, 0, CHAR_MAX);
+				arg_counter += 1;
+				char_counter = 0;
 				continue;
 			}
 		}
-		else if (cmd[i] == '\0' || cmd[i] == '\n') {
-			args[arg_counter] = (char*)malloc(32 * sizeof(char));
-			memcpy(args[arg_counter], temp_cmd, 32);
+		else if (cmd[i] == '|' || cmd[i] == '>' || cmd[i] == '&') {
+			p.opp = cmd[i];
+			if (cmd[i - 1] != ' ') {
+				p.args[arg_counter] = malloc(CHAR_MAX * sizeof(char));
+				memcpy(p.args[arg_counter], temp_arg, CHAR_MAX);
+			}
+			if (cmd[i] == '&') {
+				i += 1;
+				p.opp_err = cmd[i];
+			}
 			arg_counter += 1;
+			p.args[arg_counter] = malloc(CHAR_MAX * sizeof(char));
+			p.args[arg_counter] = (char*)NULL;
+			memset(temp_arg, 0, CHAR_MAX);
+			t->processes[process_counter] = p;
+			process_counter += 1;
+			arg_counter = 0;
 			char_counter = 0;
-			memset(temp_cmd, 0, 32);
+			continue;
+		}
+		else if (cmd[i] == '\0') {
+			if (cmd[i - 1] != ' ') {
+				p.args[arg_counter] = malloc(CHAR_MAX * sizeof(char));
+				memcpy(p.args[arg_counter], temp_arg, CHAR_MAX);
+			}
+			arg_counter += 1;
+			p.args[arg_counter] = malloc(CHAR_MAX * sizeof(char));
+			p.args[arg_counter] = (char*)NULL;
+			memset(temp_arg, 0, CHAR_MAX);
+			t->processes[process_counter] = p;
+			process_counter += 1;
+			arg_counter = 0;
+			char_counter = 0;
 			break;
 		}
 		else {
-			temp_cmd[char_counter] = cmd[i];
+			temp_arg[char_counter] = cmd[i];
 			char_counter += 1;
 		}
 	}
-	args[arg_counter] =(char*)NULL;
-	arg_counter = 0;
 }
 
 
-
-int SYS_CALL(char** args) {	
-	pid_t _pid; 
-	_pid = fork();	
+int SYS_CALL(Task* t) {
+	pid_t _pid;
+	_pid = fork();
 	if (_pid == 0) {
-		execvp(args[0], args);
+		execvp(t->processes[0].args[0], t->processes[0].args);
 		exit(-1);
 	}
 	else if (_pid > 0) {
@@ -67,12 +111,11 @@ int SYS_CALL(char** args) {
 int main(void)
 {
 	char cmd[CMDLINE_MAX];
-	char* commands[16];
-	//free(commands);
 
 	while (1) {
+		Task Run;
 		char *nl;
-		int retval=0;
+		int retval = 0;
 
 		/* Print prompt */
 		printf("sshell$ ");
@@ -87,14 +130,22 @@ int main(void)
 			fflush(stdout);
 		}
 
-		parse_command(cmd, commands);
-
 		/* Remove trailing newline from command line */
 		nl = strchr(cmd, '\n');
 		if (nl) {
 			*nl = '\0';
 		}
 
+		parse_command(cmd, &Run);
+
+		/*
+			for(int m=0;m<3;m++){
+			  printf("Process %d:\n", m);
+			  for(int n=0;n<5;n++){
+				  printf("%s\n", Run.processes[m].args[n]);
+			  }
+			}
+		*/
 
 		/* Builtin command */
 		if (!strcmp(cmd, "exit")) {
@@ -110,22 +161,25 @@ int main(void)
 			continue;
 		}
 
-		if (!strcmp(commands[0], "cd")) {
-			char* path = commands[1];
-			if(!strcmp(path, "..")) {
+		if (!strcmp(Run.processes[0].args[0], "cd")) {
+			char* path = Run.processes[0].args[2];
+			if (!strcmp(path, "..")) {
 				char* cwd = getcwd(cwd, CMDLINE_MAX);
 				int slash_index;
-				for(int k=0; k<((int)strlen(cwd))-1; k++) {
+				for (int k = 0; k < ((int)strlen(cwd)) - 1; k++) {
 					if (cwd[k] == '/') {
 						slash_index = k;
 					}
 				}
-				char* newPath = malloc(32*sizeof(char));
+				char* newPath = malloc(32 * sizeof(char));
 				newPath = strncpy(newPath, cwd, slash_index);
-				chdir(newPath);			
+				chdir(newPath);
 			}
 			else {
-				chdir(path);
+				if (chdir(path) < 0) {
+					fprintf(stderr, "Error: no such directory\n");
+					continue;
+				}
 			}
 			fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
 			continue;
@@ -133,8 +187,8 @@ int main(void)
 
 
 		/* Regular command */
-		retval = SYS_CALL(commands);
-		if(retval != 0){
+		retval = SYS_CALL(&Run);
+		if (retval != 0) {
 			fprintf(stderr, "Error: command not found\n");
 		}
 		fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
