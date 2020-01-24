@@ -63,6 +63,7 @@ int CALL_PWD(const int retval) {
 
 void CALL_EXIT() {
 	fprintf(stderr, "Bye...\n");
+	fprintf(stdout, "+ completed 'exit' [0]\n");
 	exit(0);
 }
 
@@ -283,7 +284,6 @@ int main(void) {
 		char* cmd = Run.processes[0].args[0];
 		if (!strcmp(cmd, "exit")) {
 			CALL_EXIT();
-			fprintf(stdout, "+ completed '%s' [0]\n", cmd);
 		}
 		else if (!strcmp(cmd, "pwd")) {
 			retval = CALL_PWD(retval);
@@ -291,7 +291,7 @@ int main(void) {
 		}
 		else if (!strcmp(cmd, "cd")) {
 			retval = CALL_CD(Run.processes[0].args[1], retval);
-			fprintf(stdout, "+ completed '%s' [%d]\n", cmd, retval);
+			fprintf(stdout, "+ completed '%s %s' [%d]\n", cmd, Run.processes[0].args[1], retval);
 		}
 		else if (!strcmp(cmd, "pushd")) {
 			char buf[CMDLINE_MAX];
