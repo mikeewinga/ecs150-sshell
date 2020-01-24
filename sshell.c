@@ -14,7 +14,6 @@ typedef struct task Task;
 
 struct process {
 	char* args[ARG_MAX];
-	int pid;
 	char opp;
 	char opp_err;
 };
